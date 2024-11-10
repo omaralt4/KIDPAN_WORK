@@ -3,17 +3,37 @@ library("survival")
 library("readr")
 library("pec")
 library("ranger")
-
-data <- read_csv("data_ready_final.csv")
+library("aorsf")
+library("caTools")
+library("survAUC")
+data <- read_csv("data_ready_45.csv")
 
 
 data <- as.data.frame(data)
 
+data["time_frame"] = data["time_frame"] + 1
 
-RF_obj <- rfsrc(Surv(time_frame,GRF_STAT_PA)~., data, ntree = 100,  membership = TRUE,
-                importance="permute")
+sample = sample.split(data$GRF_STAT_PA, SplitRatio = 0.75)
+
+train = subset(data, sample == TRUE)
+test = subset(data, sample == FALSE)
+
+RF_obj <- orsf(formula = Surv(time_frame, GRF_STAT_PA) ~ ., data = train, n_tree = 50,  split_rule = "cstat",
+                importance="permute", verbose_progress = TRUE)
 # Calculate variable importance
 
+
+predictions <- predict(RF_obj, new_data = test, pred_type = "surv")
+
+
+c_index <- concordance(Surv(time_frame, GRF_STAT_PA) ~ predictions)
+print(paste("Concordance Index:", c_index))
+
+
+c_index <- UnoC(Surv(train$time_frame, train$GRF_STAT_PA), 
+                Surv(test$time_frame, test$GRF_STAT_PA), 
+                predictions)
+print(paste("Uno's C-Index:", c_index))
 # Print the RSF model summary
 print(RF_obj)
 
